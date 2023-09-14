@@ -1,9 +1,8 @@
 import gym
 import numpy as np
-import time
-import random
+from tqdm import tqdm
 
-if __name__ == '__main__':
+def main():
 
     # create environment
     env = gym.make('FrozenLake-v1', desc=None, map_name="4x4", is_slippery=False)
@@ -17,12 +16,13 @@ if __name__ == '__main__':
         for m in range(n_actions):
             returns.update({(n, m): []})
     gamma = 0.7
-    n_eps = 10
-    print(env.desc) #environment map
-    for p in range(n_eps):
+    n_eps = 1000
+    #print(env.desc) #environment map
+    
+    for p in tqdm(range(n_eps), desc = "Episodes completed"):
         episode = [] # a list that contains all the state action pairs of an episode
         rewards = [] # a list that contains all the rewards of an episode
-        state = env.reset() #choose a random state
+        state = env.reset() #resets the environment to its initial state
         #state = env.observation_space.sample() #choose a random state
         done = False
         while not done: # creating an episode 
@@ -31,6 +31,7 @@ if __name__ == '__main__':
             episode.append((state, action)) 
             rewards.append(reward)
             state = new_s
+            #env.render()
         G = 0
         for q in range(-1, -len(episode)-1, -1): #reversed returns an iterable object, doesn't reverse the original list
             G = gamma*G + rewards[q]
@@ -38,9 +39,25 @@ if __name__ == '__main__':
             if len(indices) == 1 or q == min(indices):
                 returns[episode[q]] += [G]
                 
-        for key, value in returns.items():
-            if len(value)!= 0:
-                s, t = key
-                qtable[s, t] = np.average(value)
+            for key, value in returns.items():
+                if len(value)!= 0:
+                    s, t = key
+                    qtable[s, t] = np.average(value)
+            
+            policy_array = np.argmax(qtable, axis = 1)
 
-        
+    state = env.reset()
+    policy = []
+    rewards = []
+    done = False
+    while not done:
+        action = policy_array[state]
+        new_s, reward, done, prob = env.step(action)
+        policy.append((state, action))
+        rewards.append(reward)
+        state = new_s
+        env.render()
+    env.close()
+
+if __name__ == '__main__':
+    main()
