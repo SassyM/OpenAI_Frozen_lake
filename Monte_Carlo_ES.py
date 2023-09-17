@@ -1,11 +1,12 @@
 import gym
 import numpy as np
 from tqdm import tqdm
+import argparse
 
-def main():
-
+def main(gamma, n_eps):
+    
     # create environment
-    env = gym.make('FrozenLake-v1', desc=None, map_name="4x4", is_slippery=False)
+    env = gym.make('FrozenLake-v1', desc=None, is_slippery=False)
 
     n_states = env.observation_space.n #no. of states
     n_actions = env.action_space.n #no. of actions
@@ -15,8 +16,8 @@ def main():
     for n in range(n_states):
         for m in range(n_actions):
             returns.update({(n, m): []})
-    gamma = 0.7
-    n_eps = 1000
+    gamma = gamma
+    n_eps = n_eps
     #print(env.desc) #environment map
     
     for p in tqdm(range(n_eps), desc = "Episodes completed"):
@@ -60,4 +61,9 @@ def main():
     env.close()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description= 'Runs Monte Carlo Exploring Starts algorithm \
+                                     Frozen lake environemnt')
+    parser.add_argument('gamma', type = float, default=0.9, help = 'discount factor of rewards')
+    parser.add_argument('n_eps', type = int, default = 1000, help = 'No. episodes generated for learning')
+    args = parser.parse_args()
+    main(**vars(args))
