@@ -2,9 +2,10 @@ import gym
 import numpy as np
 from tqdm import tqdm
 import argparse
+import imageio 
 
 def main(gamma, n_eps):
-    
+
     # create environment
     env = gym.make('FrozenLake-v1', desc=None, is_slippery=False)
 
@@ -32,7 +33,7 @@ def main(gamma, n_eps):
             episode.append((state, action)) 
             rewards.append(reward)
             state = new_s
-            #env.render()
+            #env.render(mode='human') 
         G = 0
         for q in range(-1, -len(episode)-1, -1): #reversed returns an iterable object, doesn't reverse the original list
             G = gamma*G + rewards[q]
@@ -47,6 +48,7 @@ def main(gamma, n_eps):
             
             policy_array = np.argmax(qtable, axis = 1)
 
+    frames = []
     state = env.reset()
     policy = []
     rewards = []
@@ -57,8 +59,10 @@ def main(gamma, n_eps):
         policy.append((state, action))
         rewards.append(reward)
         state = new_s
-        env.render()
+        frame = env.render(mode= 'rgb_array')
+        frames.append(frame)
     env.close()
+    imageio.mimsave('FrozenLake.gif', frames, fps = 5)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= 'Runs Monte Carlo Exploring Starts algorithm \

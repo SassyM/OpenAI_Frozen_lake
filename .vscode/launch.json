@@ -10,9 +10,9 @@
             "request": "launch",
             "program": "C:\\Users\\srish\\RL\\OpenAI_gym\\Monte_Carlo_ES.py",
             "console": "integratedTerminal",
+            "justMyCode": false,
             "args": [
                 "0.7",
-                "4X4",
                 "1000"
             ]
         }

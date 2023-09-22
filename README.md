@@ -1,4 +1,4 @@
-#### Model-free Reinforcement learning Algorithms
+# Model-free Reinforcement learning Algorithms
 ---
 
 
@@ -8,4 +8,5 @@ Monte_Carlo_ES.py implements the MC ES Algorithm in a 4X4 frozen lake environmen
 
 ![Refernce Image](/MC_ES.png)
 
-
+The script returns the following result: 
+![Reference Image](/FrozenLake.gif)
