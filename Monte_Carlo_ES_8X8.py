@@ -7,7 +7,7 @@ import imageio
 def main(gamma, n_eps):
 
     # create environment
-    env = gym.make('FrozenLake-v1', desc=None, is_slippery=False)
+    env = gym.make("FrozenLake8x8-v1", desc=None, is_slippery=False)
 
     n_states = env.observation_space.n #no. of states
     n_actions = env.action_space.n #no. of actions
@@ -63,12 +63,12 @@ def main(gamma, n_eps):
         frames.append(frame)
         #env.render(mode='human') # to render environment
     env.close()
-    imageio.mimsave('FrozenLake.gif', frames, fps = 5)
+    imageio.mimsave('FrozenLake8x8_2.gif', frames, fps = 5)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description= 'Runs Monte Carlo Exploring Starts algorithm \
                                      Frozen lake environemnt')
     parser.add_argument('gamma', type = float, default=0.9, help = 'discount factor of rewards')
-    parser.add_argument('n_eps', type = int, default = 1000, help = 'No. episodes generated for learning')
+    parser.add_argument('n_eps', type = int, default = 2000, help = 'No. episodes generated for learning')
     args = parser.parse_args()
     main(**vars(args))
