@@ -9,8 +9,8 @@ def main(gamma, n_eps):
     # create environment
     env = gym.make("FrozenLake8x8-v1", desc=None, is_slippery=False)
 
-    n_states = env.observation_space.n #no. of states
-    n_actions = env.action_space.n #no. of actions
+    n_states = env.observation_space.n # type: ignore #no. of states
+    n_actions = env.action_space.n # type: ignore #no. of actions
     actions = env.action_space #object
     qtable = np.zeros((n_states, n_actions))
     returns = {}
