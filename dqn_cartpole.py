@@ -5,97 +5,147 @@ import numpy as np
 from tqdm import tqdm
 import gymnasium as gym
 import torch.optim as optim
-import torch.nn.functional as func
+import torch.nn.functional as F
+from collections import deque
+from torch.utils.tensorboard.writer import SummaryWriter
 
 class QNetwork(nn.Module):
-    def __init__(self, n_observations, n_actions):
+    def __init__(self, observation_size, action_size):
         super().__init__()
-        self.layer1 = nn.Linear(n_observations, 128)
+        self.layer1 = nn.Linear(observation_size, 128)
         self.layer2 = nn.Linear(128, 128) 
-        self.layer3 = nn.Linear(128, n_actions)
+        self.layer3 = nn.Linear(128, action_size)
 
     def forward(self, x):
-        x = func.relu(self.layer1(x))
-        x = func.relu(self.layer2(x))
-        return self.layer3(x) # output size = [n_observations, n_actions]
+        x = F.relu(self.layer1(x))
+        x = F.relu(self.layer2(x))
+        return self.layer3(x) # output size = [observation_size, action_size]
 
-class Epsilon():
-    def __init__(self, start, end, training_steps):
-        self.start = start
-        self.end = end
-        self.epsilon = start
-        self.training_steps = training_steps
-
-    def calculate_decay(self):
-        decay_factor = (self.end/self.start)**(1/self.training_steps)
-        return decay_factor
+class ReplayBuffer:
+    def __init__(self, capacity):
+        self.buffer = deque(maxlen=capacity)
     
-    def calculate_epsilon(self):
-        decay_factor = self.calculate_decay()
-        self.epsilon = self.epsilon * decay_factor
-        return self.epsilon
+    def add(self, state, action, reward, next_state, done):
+        self.buffer.append((state, action, reward, next_state, done))
+    
+    def sample(self, batch_size):
+        batch = random.sample(self.buffer, batch_size)
+        states, actions, rewards, next_states, dones = zip(*batch)
+        return (np.array(states), np.array(actions), np.array(rewards),
+                np.array(next_states), np.array(dones))
+    
+    def __len__(self):
+        return len(self.buffer)
+    
+# def select_action(Qvalue, env):
+#     epsilon = 0.5
+#     n = np.random.rand()
 
+#     if n < epsilon:
+#         action = env.action_space.sample()
 
-def select_action(state, Qout):
-    n = np.random.rand()
+#     else:
+#         action = torch.argmax(Qvalue)
 
-    if n < epsilon:
-        action = env.action_space.sample()
-
-    else:
-        action = torch.argmax(Qvalue)
-
-    # Qvalue = torch.sum(Qout, 1)
-    # epsilon = ep_start
-    # action = random.choice([0,1])
-    # action = torch.argmax(Qvalue)
-
-    return action
+#     return action
     
 
-def main(no_eps: int):
+def main():
+
+    BUFFER_SIZE = 10000
+    LR = 1e-3
+    BATCH_SIZE = 64
+    EPSILON_START = 1.0
+    EPSILON_END = 0.01
+    EPSILON_DECAY = 0.995
+    GAMMA = 0.99  # discount factor
+    TAU = 0.01    # Soft update parameter
+    EPISODES = 500 
 
     env = gym.make("CartPole-v1", render_mode="rgb_array")
-    buffer = []
-    n_actions = env.action_space.n  # type: ignore
-    state = env.reset(seed=11)
-    state = state[0]
-    n_observations = state.size
-    ep_start = 1.0 #in the beginning, epsilon=1
-    ep_end=0.001 
-    decay_steps = 100
-    epsilon = ep_start
-    # epsilon = Epsilon(ep_start, ep_end, 100)
-    lr = 1e-4
-    policy = QNetwork(n_observations, n_actions)
-    target = QNetwork(n_observations, n_actions)
-    # initialize weights of the policy and the target network
-    target.load_state_dict(policy.state_dict())
+    # initialize replay buffer
+    buffer = ReplayBuffer(BUFFER_SIZE)
+    writer = SummaryWriter(log_dir="runs/dqn_cartpole")
+
+    observation_size = env.observation_space.shape[0] 
+    action_size = env.action_space.n  # type: ignore
+
+    q_net = QNetwork(observation_size, action_size)
+    target_net = QNetwork(observation_size, action_size)
+    # initialize weights of the q_net and the target_net network
+    target_net.load_state_dict(q_net.state_dict())
     # set optimizer
-    optimizer = optim.Adam(policy.parameters(), lr = lr)
-    training_step = 0 
-    for ep in tqdm(range(no_eps), desc = "Episodes completed"):
-        term, trunc = False, False
+    optimizer = optim.Adam(q_net.parameters(), lr = LR)
+    epsilon = EPSILON_START
+
+    for ep in tqdm(range(EPISODES), desc = "Episodes completed"):
+        done = False
         state = env.reset(seed=11)
         state = state[0]
-        while term == False and trunc == False:
-            action = select_action(state)
+        total_reward = 0 
 
-            action = env.action_space.sample()
-            new_s, reward, term, trunc, _ = env.step(action)
-            buffer.append((state, action, reward, new_s))
-            state = new_s
-            step +=1
-        ep +=1
+        while not done:
 
+            # Epsilon-greedy action selection
+            n = np.random.rand()
+            if n <= epsilon:
+                action = env.action_space.sample()
+            else:
+                state_tensor = torch.FloatTensor(state).unsqueeze(0)
+                with torch.no_grad():
+                    q_values = q_net(state_tensor)
+                action = q_values.argmax().item()
 
-        training_step +=1
+            new_state, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
+            buffer.add(state, action, reward, new_state, done)
+            state = new_state
+            total_reward += float(reward)
 
+            # Train when buffer has enough samples
+            if len(buffer) >= BATCH_SIZE:
+              states, actions, rewards, next_states, dones = buffer.sample(BATCH_SIZE)  
+              states = torch.FloatTensor(states)
+              actions = torch.LongTensor(actions)
+              rewards = torch.FloatTensor(rewards)
+              next_states = torch.FloatTensor(next_states)
+              dones = torch.FloatTensor(dones)
+
+              # Compute Q-values and target
+              current_q = q_net(states).gather(1, actions.unsqueeze(1)).squeeze()
+              next_q = target_net(next_states).max(1)[0].detach()
+              target_q = rewards + GAMMA * next_q * (1 - dones)
+
+              # Optimize the model
+              loss = nn.MSELoss()(current_q, target_q)
+              optimizer.zero_grad()
+              loss.backward()
+              optimizer.step()
+
+              # Log loss to TensorBoard
+              writer.add_scalar("Loss", loss.item(), ep)
+
+              # Soft update target network
+              for target_param, q_param in zip(target_net.parameters(), q_net.parameters()):
+                target_param.data.copy_(TAU * q_param.data + (1 - TAU) * target_param.data)
+
+        # Decay epsilon
+        epsilon = max(EPSILON_END, epsilon * EPSILON_DECAY)
+
+        # Log episode reward and epsilon to TensorBoard
+        writer.add_scalar("Episode Reward", total_reward, ep)
+        writer.add_scalar("Epsilon", epsilon, ep)
+        
+        # Monitor progress
+        if (ep + 1) % 10 == 0:
+            print(f"Episode: {ep+1}, Total Reward: {total_reward}, Epsilon: {epsilon:.2f}")
+
+    writer.close()
 
 
 if __name__ == "__main__":
 
-    main(no_eps = 1000)
+    main()
 
 
 
