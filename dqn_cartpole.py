@@ -37,19 +37,7 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
     
-# def select_action(Qvalue, env):
-#     epsilon = 0.5
-#     n = np.random.rand()
-
-#     if n < epsilon:
-#         action = env.action_space.sample()
-
-#     else:
-#         action = torch.argmax(Qvalue)
-
-#     return action
     
-
 def main():
 
     BUFFER_SIZE = 10000
@@ -62,12 +50,14 @@ def main():
     TAU = 0.01    # Soft update parameter
     EPISODES = 500 
 
+    # TODO: Record video
     env = gym.make("CartPole-v1", render_mode="rgb_array")
     # initialize replay buffer
     buffer = ReplayBuffer(BUFFER_SIZE)
+    # TODO: Check if Summary writer is working correctly
     writer = SummaryWriter(log_dir="runs/dqn_cartpole")
 
-    observation_size = env.observation_space.shape[0] 
+    observation_size = env.observation_space.shape[0]  # type: ignore
     action_size = env.action_space.n  # type: ignore
 
     q_net = QNetwork(observation_size, action_size)
@@ -146,6 +136,3 @@ def main():
 if __name__ == "__main__":
 
     main()
-
-
-
