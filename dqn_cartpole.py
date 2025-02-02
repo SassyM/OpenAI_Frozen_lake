@@ -1,13 +1,19 @@
+# %%
 import torch
+
+# %%
 import random 
 from torch import nn
 import numpy as np
 from tqdm import tqdm
 import gymnasium as gym
+from gymnasium import Wrapper
 import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque
 from torch.utils.tensorboard.writer import SummaryWriter
+from matplotlib import pyplot as plt
+from matplotlib import animation
 
 class QNetwork(nn.Module):
     def __init__(self, observation_size, action_size):
@@ -37,17 +43,30 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
     
-    
+
+def select_action(epsilon, env, state, q_net):
+    # Epsilon-greedy action selection
+    n = np.random.rand()
+    if n <= epsilon:
+        action = env.action_space.sample()
+    else:
+        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        with torch.no_grad():
+            q_values = q_net(state_tensor)
+        action = q_values.argmax().item()    
+
+    return action
+
 def main():
 
     BUFFER_SIZE = 10000
-    LR = 1e-3
+    LR = 1e-4
     BATCH_SIZE = 64
-    EPSILON_START = 1.0
-    EPSILON_END = 0.01
-    EPSILON_DECAY = 0.995
+    EPSILON_START = 0.9
+    EPSILON_END = 0.05
+    EPSILON_DECAY = 0.99
     GAMMA = 0.99  # discount factor
-    TAU = 0.01    # Soft update parameter
+    TAU = 0.005    # Soft update parameter
     EPISODES = 500 
 
     # TODO: Record video
@@ -76,15 +95,7 @@ def main():
 
         while not done:
 
-            # Epsilon-greedy action selection
-            n = np.random.rand()
-            if n <= epsilon:
-                action = env.action_space.sample()
-            else:
-                state_tensor = torch.FloatTensor(state).unsqueeze(0)
-                with torch.no_grad():
-                    q_values = q_net(state_tensor)
-                action = q_values.argmax().item()
+            action = select_action(epsilon, env, state, q_net)
 
             new_state, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
@@ -132,6 +143,44 @@ def main():
 
     writer.close()
 
+    env.close()
+
+    # Testing the trained agent
+    env = gym.make("CartPole-v1", render_mode = "human")
+    env = Wrapper(env)
+    q_net.eval()
+    state = env.reset(seed=11)[0]
+    frames, done = [], False
+    total_reward = 0.0
+    while not done:
+        action = select_action(epsilon=0.0, env=env, state=state, q_net=q_net)
+        next_state, reward, terminated, truncated, _ = env.step(action)
+        total_reward += float(reward)
+    #     frame = env.render()
+    #     frames.append(frame)
+
+    
+    # print(f"Testing finished after {len(frames)} steps, total reward = {total_reward}")
+
+    # # np array with shape (frames, height, width, channels)
+    # video = np.array(frames[:]) 
+
+    # fig = plt.figure(figsize=(6, 4))
+    # im = plt.imshow(video[0,:,:,:])
+    # plt.axis('off')
+    # plt.close() # this is required to not display the generated image
+
+    # def init():
+    #     im.set_data(video[0,:,:,:])
+
+    # def animate(i):
+    #     im.set_data(video[i,:,:,:])
+    #     return im
+
+    # anim = animation.FuncAnimation(fig, animate, init_func=init, frames=video.shape[0],
+    #                             interval=100)
+
+    # anim.save('./cart-pole-video.mp4')
 
 if __name__ == "__main__":
 
