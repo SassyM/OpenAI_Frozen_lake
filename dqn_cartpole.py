@@ -2,12 +2,13 @@
 import torch
 
 # %%
+import os, datetime
+# %%
 import random 
 from torch import nn
 import numpy as np
 from tqdm import tqdm
 import gymnasium as gym
-from gymnasium import Wrapper
 import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque
@@ -42,7 +43,7 @@ class ReplayBuffer:
     
     def __len__(self):
         return len(self.buffer)
-    
+
 
 def select_action(epsilon, env, state, q_net):
     # Epsilon-greedy action selection
@@ -56,6 +57,12 @@ def select_action(epsilon, env, state, q_net):
         action = q_values.argmax().item()    
 
     return action
+
+def save_model(q_net):
+    model_dir = os.path.join('model', datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+    os.makedirs(model_dir, exist_ok=True)
+    model_path=os.path.join(model_dir, 'cartpole-dqn.pth')
+    torch.save(q_net.state_dict(), model_path)
 
 def main():
 
@@ -74,7 +81,8 @@ def main():
     # initialize replay buffer
     buffer = ReplayBuffer(BUFFER_SIZE)
     # TODO: Check if Summary writer is working correctly
-    writer = SummaryWriter(log_dir="runs/dqn_cartpole")
+    log_dir = os.path.join(os.getcwd(), 'runs', datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+    writer = SummaryWriter(log_dir=log_dir)
 
     observation_size = env.observation_space.shape[0]  # type: ignore
     action_size = env.action_space.n  # type: ignore
@@ -89,8 +97,7 @@ def main():
 
     for ep in tqdm(range(EPISODES), desc = "Episodes completed"):
         done = False
-        state = env.reset(seed=11)
-        state = state[0]
+        state, _ = env.reset()
         total_reward = 0 
 
         while not done:
@@ -141,46 +148,10 @@ def main():
         if (ep + 1) % 10 == 0:
             print(f"Episode: {ep+1}, Total Reward: {total_reward}, Epsilon: {epsilon:.2f}")
 
+    print("Saving trained model")
+    save_model(q_net)
     writer.close()
-
     env.close()
-
-    # Testing the trained agent
-    env = gym.make("CartPole-v1", render_mode = "human")
-    env = Wrapper(env)
-    q_net.eval()
-    state = env.reset(seed=11)[0]
-    frames, done = [], False
-    total_reward = 0.0
-    while not done:
-        action = select_action(epsilon=0.0, env=env, state=state, q_net=q_net)
-        next_state, reward, terminated, truncated, _ = env.step(action)
-        total_reward += float(reward)
-    #     frame = env.render()
-    #     frames.append(frame)
-
-    
-    # print(f"Testing finished after {len(frames)} steps, total reward = {total_reward}")
-
-    # # np array with shape (frames, height, width, channels)
-    # video = np.array(frames[:]) 
-
-    # fig = plt.figure(figsize=(6, 4))
-    # im = plt.imshow(video[0,:,:,:])
-    # plt.axis('off')
-    # plt.close() # this is required to not display the generated image
-
-    # def init():
-    #     im.set_data(video[0,:,:,:])
-
-    # def animate(i):
-    #     im.set_data(video[i,:,:,:])
-    #     return im
-
-    # anim = animation.FuncAnimation(fig, animate, init_func=init, frames=video.shape[0],
-    #                             interval=100)
-
-    # anim.save('./cart-pole-video.mp4')
 
 if __name__ == "__main__":
 
